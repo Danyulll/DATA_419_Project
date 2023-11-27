@@ -18,6 +18,9 @@ library(mvtnorm)
 ```
 
 ```{r}
+library(plotly)
+library(tidyr)
+library(plyr)
 library(klaR)
 library(mvtnorm)
 set.seed(231354)
@@ -71,29 +74,9 @@ plot1 <-
     type = "surface",
     colors = "viridis",
     opacity = 0.7
-  )|> add_surface(
-    x = x,
-    y = y,
-    z = density3,
-    colors = "viridis",
-    opacity = 0.7
-  ) |> add_markers(
-  data = dgp,
-  x = dgp$X1,
-  y = dgp$X2,
-  z = 0,
-  opacity=1,
-  color = ~dgp$G
-) |> add_markers(
-    x = grid$X1,
-    y = grid$X2,
-    z = 0,
-    color=~prd,
-    opacity=0.01
   )
-
-
-plot1 
+hide_legend(plot1)
+ 
 
 ```
 
