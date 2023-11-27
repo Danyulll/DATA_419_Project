@@ -9,634 +9,110 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# LDA Visualizations
-
 ```{r}
-library(plotly)
-library(klaR)
-library(mvtnorm)
+df <- read.csv(".\\data\\cirrhosis.csv",sep = ",",header = T)
+head(df)
 ```
 
-```{r}
-library(plotly)
-library(tidyr)
-library(plyr)
-library(klaR)
-library(mvtnorm)
-set.seed(231354)
+Cirrhosis results from prolonged liver damage, leading to extensive scarring, often due to conditions like hepatitis or chronic alcohol consumption. The data provided is sourced from a Mayo Clinic study on primary biliary cirrhosis (PBC) of the liver carried out from 1974 to 1984.
 
-sigma1 <- matrix(c(1, 0, 0, 1), 2, 2, byrow = TRUE)
+<https://aasldpubs.onlinelibrary.wiley.com/doi/epdf/10.1002/hep.1840100102>
 
-mu1 <- c(0, 0)
-mu2 <- c(0, 2)
-
-# Generate 2D MVN data from 1 group so one MVN
-group1 <- data.frame(rmvnorm(100, mean = mu1, sigma = sigma1))
-
-# Generate more 2D MVN from a different dist, that's group 2.
-group2 <- data.frame(rmvnorm(100, mean = mu2, sigma = sigma1))
-
-
-groups <- c(rep("G1", 100), rep("G2", 100))
-
-dgp <-
-  data.frame(
-    "G" = groups,
-    "X1" = c(group1$X1, group2$X1),
-    "X2" = c(group1$X2, group2$X2)
-  )
-
-# Now I can plot the underlying densities that generated them (this is not the same thing as plotting the points). Make the densities see through
-
-x <- seq(-5, 5, length.out = 100)
-y <- seq(-5, 5, length.out = 100)
-grid <- expand.grid(x = x, y = y)
-colnames(grid) <- colnames(xdat)[-1]
-
-
-# Calculate the probability density for each point on the grid for both Gaussians
-pdf_values1 <- dmvnorm(grid, mean = mu1, sigma = sigma1)
-pdf_values2 <- dmvnorm(grid, mean = mu2, sigma = sigma1)
-
-# Reshape the density values to match the grid
-density1 <- matrix(pdf_values1, nrow = length(x))
-density2 <- matrix(pdf_values2, nrow = length(x))
-
-lda.out <- lda(G~.,dgp)
-
-prd = as.numeric(predict(lda.out, newdata = grid)$class)
-
-plot1 <-
-  plot_ly(
-    x = x,
-    y = y,
-    z = density1,
-    type = "surface",
-    colors = "viridis",
-    opacity = 0.7
-  )
-hide_legend(plot1)
- 
-
-```
-
-
-```{r}
-library(MASS)
-
-mydata <-
-  structure(
-    list(
-      Group = c(
-        "a",
-        "a",
-        "a",
-        "a",
-        "a",
-        "a",
-        "a",
-        "a",
-        "b",
-        "b",
-        "b",
-        "b",
-        "b",
-        "b",
-        "b",
-        "b",
-        "c",
-        "c",
-        "c",
-        "c",
-        "c",
-        "c",
-        "c",
-        "c"
-      ),
-      Var1 = c(
-        7.5,
-        6.9,
-        6.5,
-        7.3,
-        8.1,
-        8,
-        7.4,
-        7.8,
-        8.3,
-        8.7,
-        8.9,
-        9.3,
-        8.5,
-        9.6,
-        9.8,
-        9.7,
-        11.2,
-        10.9,
-        11.5,
-        12,
-        11,
-        11.6,
-        11.7,
-        11.3
-      ),
-      Var2 = c(
-        -6.5,
-        -6.2,
-        -6.7,
-        -6.9,
-        -7.1,-8,
-        -6.5,
-        -6.3,
-        -9.3,
-        -9.5,
-        -9.6,
-        -9.1,
-        -8.9,
-        -8.7,
-        -9.9,
-        -10,-6.7,
-        -6.4,
-        -6.8,
-        -6.1,
-        -7.1,
-        -8,
-        -6.9,
-        -6.6
-      )
-    ),
-    .Names = c("Group",
-               "Var1", "Var2"),
-    class = "data.frame",
-    row.names = c(NA,-24L)
-  )
-
-np <- 300
-
-nd.x = seq(
-  from = min(mydata$Var1),
-  to = max(mydata$Var1),
-  length.out = np
-)
-nd.y = seq(
-  from = min(mydata$Var2),
-  to = max(mydata$Var2),
-  length.out = np
-)
-nd = expand.grid(Var1 = nd.x, Var2 = nd.y)
-
-#run lda and predict using new data
-new.lda = lda(Group ~ Var1 + Var2, data = mydata)
-prd = as.numeric(predict(new.lda, newdata = nd)$class)
-
-#create LD sequences from min - max values
-p = predict(new.lda, newdata = nd)
-p.x = seq(from = min(p$x[, 1]),
-          to = max(p$x[, 1]),
-          length.out = np) #LD1 scores
-p.y = seq(from = min(p$x[, 2]),
-          to = max(p$x[, 2]),
-          length.out = np) #LD2 scores
-
-# notice I don't use t.lda for first variable
-plot(
-  new.lda,
-  panel = function(x, y, ...) {
-    points(x, y, ...)
-  },
-  col = c(4, 2, 3)[factor(mydata$Group)],
-  pch = c(17, 19, 15)[factor(mydata$Group)],
-  ylim = c(-3, 3),
-  xlim = c(-5, 5)
-)
-
-contour(
-  x = p.x,
-  y = p.y,
-  z = matrix(prd, nrow = np, ncol = np),
-  levels = c(1, 2, 3),
-  add = TRUE,
-  drawlabels = FALSE
-)
-```
+| Variable Name | Type        | Description                                                                                                                                                                  | Units   |
+|---------------|-------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| ID            | Integer     | Categorical                                                                                                                                                                  |         |
+| N_Days        | Integer     | number of days between registration and the earlier of death, transplantation, or study analysis time in July 1986                                                           |         |
+| Status        | Categorical | status of the patient C (censored), CL (censored due to liver tx), or D (death)                                                                                              |         |
+| Drug          | Categorical | type of drug D-penicillamine or placebo                                                                                                                                      |         |
+| Age           | Integer     | age                                                                                                                                                                          | days    |
+| Sex           | Categorical | M (male) or F (female)                                                                                                                                                       |         |
+| Ascites       | Categorical | presence of ascites N (No) or Y (Yes)                                                                                                                                        |         |
+| Hepatomegaly  | Categorical | presence of hepatomegaly N (No) or Y (Yes)                                                                                                                                   |         |
+| Spiders       | Categorical | presence of spiders N (No) or Y (Yes)                                                                                                                                        |         |
+| Edema         | Categorical | presence of edema N (no edema and no diuretic therapy for edema), S (edema present without diuretics, or edema resolved by diuretics), or Y (edema despite diuretic therapy) |         |
+| Bilirubin     | Continuous  | serum bilirubin                                                                                                                                                              | mg/dl   |
+| Cholesterol   | Integer     | serum cholesterol                                                                                                                                                            | mg/dl   |
+| Albumin       | Continuous  | albumin                                                                                                                                                                      | gm/dl   |
+| Copper        | Integer     | urine copper                                                                                                                                                                 | ug/day  |
+| Alk_Phos      | Continuous  | alkaline phosphatase                                                                                                                                                         | U/liter |
+| SGOT          | Continuous  | SGOT                                                                                                                                                                         | U/ml    |
+| Tryglicerides | Integer     | tryglicerides                                                                                                                                                                |         |
+| Platelets     | Integer     | platelets per cubic                                                                                                                                                          | ml/1000 |
+| Prothrombin   | Continuous  | prothrombin time                                                                                                                                                             | s       |
+| Stage         | Categorical | histologic stage of disease (1, 2, 3, or 4)                                                                                                                                  |         |
+|               |             |                                                                                                                                                                              |         |
 
 
 
 
 ```{r}
-library(plotly)
-x <- seq(-10, 10, by = 0.5)
-y <- seq(-10, 10, by = 0.5)
-z_values <- expand.grid(x = x, y = y) %>%
-  mutate(z = (1 - 0.164694 * x - 1.003421 * y))
-plot <- plot_ly(z = ~matrix(z_values$z, ncol = length(x)),
-               type = "surface")
-
-plot <- plot %>% layout(
-  title = "3D Plane Plot",
-  scene = list(
-    xaxis = list(title = "X-axis"),
-    yaxis = list(title = "Y-axis"),
-    zaxis = list(title = "Z-axis"),
-    aspectmode = "cube"
-  )
-)
-
-# Display the plot
-plot
-
-
+str(df)
 ```
-
-
 
 ```{r}
-library(plotly)
-
-df <- data.frame(x = rnorm(10), y = rnorm(10), z = rnorm(10))
-planDf <- data.frame(x = rep(range(df$x), 2), y = rep(range(df$y), each = 2), z = mean(df$z))
-                 
-plot_ly(df) %>%
-  add_markers(x = ~x, y = ~y, z = ~z) %>%
-  add_mesh(x = ~x, y = ~y, z = ~z, data = planDf, opacity = 0.3)
+dim(df)
+df <- na.omit(df)
+dim(df)
 ```
-
-
 
 ```{r}
-library(plotly)
-
-# Coefficients of linear discriminants
-coefficients <- c(0.164694, 1.003421)
-
-# Define a grid of values for X1 and X2
-x1 <- seq(-5, 5, length.out = 100)
-x2 <- seq(-5, 5, length.out = 100)
-
-# Create a mesh grid for X1 and X2
-grid <- expand.grid(X1 = x1, X2 = x2)
-
-# Calculate the corresponding Z values based on the coefficients
-z <- coefficients[1] * grid$X1 + coefficients[2] * grid$X2
-
-# Create a 3D surface plot
-plot <- plot_ly(x = grid$X1, y = grid$X2, z = matrix(z, nrow = 100, ncol = 100), type = "surface")
-
-# Display the plot
-plot
-
-
+library(dplyr)
+Status <- factor(df$Status)
+df |> select(is.numeric) -> df
+df <- cbind(Status,df)
+df <- df[,-2]
+df <- df[,-13]
+# for (i in 1:ncol(df)) {
+#   if(typeof(df[,i])=="character"){
+#     df[,i] <- factor(df[,i])
+#   }
+# }
+# df$Stage <- factor(df$Stage)
 ```
-
-
 
 ```{r}
 library(klaR)
-library(mvtnorm)
-library(plotly)
-set.seed(231354)
-
-# DGP
-mu1 <- c(0,0)
-sigma1 <- matrix(c(1, 0, 0, 1), 2, 2, byrow=TRUE)
-
-mu2 <- c(2,0)
-sigma2 <- matrix(c(1, 0, 0, 1), 2, 2, byrow=TRUE)
-
-# Simulate data
-g1 <- rmvnorm(100, mean=mu1, sigma=sigma1)
-g2 <- rmvnorm(100, mean=mu2, sigma=sigma2)
-
-xdat <- cbind(data.frame("G" = c(rep("G1",100),rep("G2",100))),data.frame(rbind(g1, g2)))
-
-# Fit LDA
-lda.out <- lda(G~.,xdat)
-
-# Get decision boundary TODO might have to solve for this instead
-x <- seq(-5, 5, length.out = 100)
-y <- seq(-5, 5, length.out = 100)
-grid <- expand.grid(x = x, y = y)
-colnames(grid) <- colnames(xdat)[-1]
-lda.pred <- predict(lda.out,grid)
-
-# Save prediction data
-pred.data <- data.frame("G" = lda.pred$class, "X1" = grid$X1, "X2" = grid$X2)
-
-# Calculate the probability density for each point on the grid for both Gaussians
-pdf_values1 <- dmvnorm(grid, mean = mu1, sigma = sigma1)
-pdf_values2 <- dmvnorm(grid, mean = mu2, sigma = sigma2)
-
-# Reshape the density values to match the grid
-density1 <- matrix(pdf_values1, nrow = length(x))
-density2 <- matrix(pdf_values2, nrow = length(x))
-
-# Make plane data (z = x + y)
-plot_x_y_z <- data.frame("x" = pred.data$X1, "y" = pred.data$X2, "z" = pred.data$X1 + pred.data$X2, "G" = pred.data$G)
-plot_x_y_z <- subset(plot_x_y_z, z <= 0.3 & z >=0) # Don't want plane values that violate probability
-
-# Create a 3D surface plot for the first Gaussian density
-plot1 <-
-  plot_ly(
-    x = x,
-    y = y,
-    z = density1,
-    type = "surface",
-    colors = "viridis"
-  )
-
-# Add a 3D surface plot for the second Gaussian density with a different color
-plot2 <-
-  add_surface(
-    plot1,
-    x = x,
-    y = y,
-    z = density2,
-    colors = "jet"
-  )
-
-
-
-
-# Label plot
-plot2 <- plot2 %>%
-  layout(scene = list(
-    zaxis = list(title = "Density"),
-    xaxis = list(title = "X"),
-    yaxis = list(title = "Y")
-  ),
-  title = "Intersecting Gaussian Distributions")
-  opacity = 0.1
-
-
-
-# Display the plot
-plot2
-```
-
-```{r}
-any(lda.pred$posterior[,1]==lda.pred$posterior[,2])
-```
-
-
-```{r}
-# input: 
-# model: classification model
-# data: training set
-# class: response variable
-
-boundary <- function(model, data, class = NULL, predict_type = "class",
-  resolution = 100, showgrid = TRUE, ...) {
-
-  if(!is.null(class)) cl <- data[,class] else cl <- 1
-  data <- data[,1:2]
-  k <- length(unique(cl))
-
-  plot(data, col = as.integer(cl)+1L, pch = as.integer(cl)+1L, ...)
-
-  # make grid
-  r <- sapply(data, range, na.rm = TRUE)
-  xs <- seq(r[1,1], r[2,1], length.out = resolution)
-  ys <- seq(r[1,2], r[2,2], length.out = resolution)
-  g <- cbind(rep(xs, each=resolution), rep(ys, time = resolution))
-  colnames(g) <- colnames(r)
-  g <- as.data.frame(g)
-
-  ### guess how to get class labels from predict
-  ### (unfortunately not very consistent between models)
-  p <- predict(model, g, type = predict_type)
-  if(is.list(p)) p <- p$class
-  p <- as.factor(p)
-
-  if(showgrid) points(g, col = as.integer(p)+1L, pch = ".")
-
-  z <- matrix(as.integer(p), nrow = resolution, byrow = TRUE)
-  contour(xs, ys, z, add = TRUE, drawlabels = FALSE,
-    lwd = 2, levels = (1:(k-1))+.5)
-
-  invisible(z)
-}
-
-
-boundary(lda.out,xdat,class="G")
-```
-
-```{r}
-library(MASS)  # Load the MASS library for kde2d function
-
-boundary_3d <- function(model, data, class = NULL, predict_type = "class",
-                        resolution = 100, showgrid = TRUE, ...) {
-
-  if (!is.null(class)) cl <- data[, class] else cl <- 1
-  data <- data[, 1:2]
-  k <- length(unique(cl))
-
-  plot(data, col = as.integer(cl) + 1L, pch = as.integer(cl) + 1L, ...)
-
-  # Make grid
-  r <- sapply(data, range, na.rm = TRUE)
-  xs <- seq(r[1, 1], r[2, 1], length.out = resolution)
-  ys <- seq(r[1, 2], r[2, 2], length.out = resolution)
-  g <- cbind(rep(xs, each = resolution), rep(ys, time = resolution))
-  colnames(g) <- colnames(r)
-  g <- as.data.frame(g)
-
-  # Estimate 2D densities using kernel density estimation (KDE)
-  density <- kde2d(data[, 1], data[, 2], n = resolution)
-
-  if (showgrid) {
-    # Plot the density in 3D
-    persp(xs, ys, density$z, col = "lightblue", main = "2D Density",
-          xlab = "X-axis", ylab = "Y-axis", zlab = "Density", ...)
-  }
-
-  # Guess how to get class labels from predict
-  p <- predict(model, g, type = predict_type)
-  if (is.list(p)) p <- p$class
-  p <- as.factor(p)
-
-  if (showgrid) points(g, col = as.integer(p) + 1L, pch = ".")
-
-  z <- matrix(as.integer(p), nrow = resolution, byrow = TRUE)
-  contour(xs, ys, z, add = TRUE, drawlabels = FALSE,
-          lwd = 2, levels = (1:(k - 1)) + 0.5)
-
-  invisible(z)
-}
-
-# Load the required library and the iris dataset
-library(MASS)
-data(iris)
-
-# Fit an LDA model using the iris dataset
-lda_model <- lda(Species ~ Sepal.Length + Sepal.Width, data = iris)
-
-# Create a 3D plot with decision boundaries and densities
-boundary_3d(lda_model, iris, class = "Species", resolution = 100)
-
-
-```
-
-
-```{r}
-library(MASS)
-data(iris)
-
-# only use two predictors
-x <- iris[1:150, c("Sepal.Length", "Sepal.Width", "Species")]
-model4 <- lda(Species ~ ., data=x)
-
-boundary(model4, x, class = "Species", main = "LDA")
-```
-
-
-```{r}
-library(MASS)
-library(plotly)
-
-boundary_3d_plotly <- function(model, data, class = NULL, predict_type = "class",
-                              resolution = 100, ...) {
-
-  if (!is.null(class)) cl <- data[, class] else cl <- 1
-  data <- data[, 1:2]
-  k <- length(unique(cl))
-
-  p <- plot_ly(data, x = ~data[, 1], y = ~data[, 2], z = ~cl, type = "scatter", mode = "markers", marker = list(size = 4))
-
-  # Make grid
-  r <- sapply(data, range, na.rm = TRUE)
-  xs <- seq(r[1, 1], r[2, 1], length.out = resolution)
-  ys <- seq(r[1, 2], r[2, 2], length.out = resolution)
-  g <- expand.grid(x = xs, y = ys)
-
-  # Estimate 2D densities using kernel density estimation (KDE)
-  density <- kde2d(data[, 1], data[, 2], n = resolution)
-
-  # Create 3D density surface plot
-  density_surface <- plot_ly(x = xs, y = ys, z = t(density$z), type = "surface")
-
-  # Add decision boundary contour plot
-  p <- add_trace(p, data = g, z = predict(model, g, type = predict_type)$class, type = "contour", contours = list(z = list(show = TRUE, usecolormap = FALSE, highlight = FALSE))
-
-  # Combine the plots
-  p <- subplot(p, density_surface, nrows = 2, margin = 0.05)
-  p <- layout(p, scene = list(xaxis = list(title = 'X-axis'), yaxis = list(title = 'Y-axis'), zaxis = list(title = 'Z-axis')))
-
-  return(p)
-}
-
-# Example usage with the iris dataset
-data(iris)
-lda_model <- lda(Species ~ Sepal.Length + Sepal.Width, data = iris)
-plot <- boundary_3d_plotly(lda_model, iris, class = "Species", resolution = 100)
-plot
-
-```
-
-
-
-
-```{r}
-library(shiny)
-library(plotly)
-library(klaR)
-library(mvtnorm)
-set.seed(231354)
-
-ui <- fluidPage(
-  fluidRow(
-    column(6,
-           numericInput("sld1x", "Change mu1x:",  value = 0) )
-  ),fluidRow(
-    column(6,
-           numericInput("sld1y", "Change mu1y:",  value = 0) )
-  ),fluidRow(
-    column(6,
-           numericInput("sld2x", "Change mu2:",  value = 0) )
-  ),fluidRow(
-    column(6,
-           numericInput("sld2y", "Change mu2:",  value = 0) )
-  ),
-  actionButton("regenerate", "Regenerate Plot"),
-  actionButton("pointview", "View Points"),
-  plotlyOutput("gaussian_plot"),
+library(MLmetrics)
+rda_out <- rda(Status~.,df)
+
+
+ConfusionMatrix(predict(rda_out)$class, df$Status)
+
+# Calculate and format results
+post <- predict(rda_out)$posterior
+class <- predict(rda_out)$class
+y_pred <- as.numeric(predict(rda_out)$class)
+y_true <- as.numeric(df$Status)
+res <-
+data.frame(
+"Precision" = Precision(y_true, y_pred),
+"Recall" = Recall(y_true, y_pred),
+"F1_Score" = F1_Score(y_true, y_pred)
 )
+res
+```
 
-
-server <- function(input, output, session) {
-  plot_data <- eventReactive(input$regenerate,{
-    # Population Params
-    sigma1 <- matrix(c(1, 0, 0, 1), 2, 2, byrow = TRUE)
-    # mu1 <- c(input$sld1x, input$sld1y)
-    # mu2 <- c(input$sld2x, input$sld2y)
-  mu1 <- mu2 <- c(0,0)
-    # DGP
-    group1 <- data.frame(rmvnorm(100, mean = mu1, sigma = sigma1))
-    group2 <- data.frame(rmvnorm(100, mean = mu2, sigma = sigma1))
-    groups <- c(rep("G1", 100), rep("G2", 100))
-    
-    dgp <-
-      data.frame(
-        "G" = groups,
-        "X1" = c(group1$X1, group2$X1),
-        "X2" = c(group1$X2, group2$X2)
-      )
-    
-    # Set up grid
-    x <- seq(-5, 5, length.out = 100)
-    y <- seq(-5, 5, length.out = 100)
-    grid <- expand.grid(x = x, y = y)
-    
-    # Calculate densities values for dists
-    pdf_values1 <- dmvnorm(grid, mean = mu1, sigma = sigma1)
-    pdf_values2 <- dmvnorm(grid, mean = mu2, sigma = sigma1)
-    
-    # Reshape the density values to match the grid
-    density1 <- matrix(pdf_values1, nrow = length(x))
-    density2 <- matrix(pdf_values2, nrow = length(x))
-    
-    # Fit LDA model
-    lda.out <- lda(G~.,dgp)
-    colnames(grid) <- c("X1","X2")
-    # Get grid predictions
-    prd = as.numeric(predict(lda.out, newdata = grid)$class)
-    
-    plot1 <-
-      plot_ly(
-        x = x,
-        y = y,
-        z = density1,
-        type = "surface",
-        colors = "viridis",
-        opacity = 0.7
-      )|> add_surface(
-        x = x,
-        y = y,
-        z = density2,
-        colors = "viridis",
-        opacity = 0.7
-      ) |> add_markers(
-        data = dgp,
-        x = dgp$X1,
-        y = dgp$X2,
-        z = 0,
-        opacity=1,
-        color = ~dgp$G
-      ) |> add_markers(
-        x = grid$X1,
-        y = grid$X2,
-        z = 0,
-        color=~prd,
-        opacity=0.01
-      )})
-    
-    output$gaussian_plot <- renderPlotly({
-      plot_data()
-    })
-    
-    
-  }
-
-shinyApp(ui, server)
+```{r}
+factanal(df[,-1], factors = 2,rotation = "varimax") #TODo ask jeff if its bad to keep only 2 factors if we reject the null
 ```
 
 
+```{r}
+pca.out <- prcomp(df[,-1])
+summary(pca.out)
+```
+
+```{r}
+loadi <- round(pca.out$rotation[,1:2],4)
+# loadi[abs(loadi)<0.001] <- NA
+loadi
+```
+TODO try to interpret this...
+
+
+
+Then do visualization
+
+
+Could be fun to try pair plot visualization
 
