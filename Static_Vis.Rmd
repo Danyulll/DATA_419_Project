@@ -25,13 +25,56 @@ bc <- na.omit(bc)
 bc <- bc[,-1]
 bc$diagnosis <- factor(bc$diagnosis)
 bc
+
+as.data.frame(summary(bc))
 ```
-```{r}
-plot(bc[,-1])
+
+id
+Unique ID
+
+diagnosis
+Target: M - Malignant B - Benign
+
+radius_mean
+Radius of Lobes
+
+texture_mean
+Mean of Surface Texture
+
+perimeter_mean
+Outer Perimeter of Lobes
+
+area_mean
+Mean Area of Lobes
+
+smoothness_mean
+Mean of Smoothness Levels
+
+compactness_mean
+Mean of Compactness
+
+concavity_mean
+Mean of Concavity
+
+concave points_mean
+Mean of Cocave Points
+
+
+
+
+```{r, message=FALSE, warning=FALSE}
+# plot(bc[,2:11])
+library(GGally)
+library(ggplot2)
+# ggpairs(bc[,2:11])
+data <- bc[,1:11]
+ggpairs(data, columns = 1:11, aes(color = diagnosis, alpha = 0.5),
+        upper = list(continuous = wrap("cor", size = 2.5)))
 ```
 
 
 ```{r}
+bc <- bc[,1:11]
 rda_out <- rda(diagnosis~.,bc)
 # Calculate and format results
 post <- predict(rda_out)$posterior
