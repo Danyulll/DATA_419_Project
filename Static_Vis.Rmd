@@ -9,80 +9,38 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
-df <- read.csv(".\\data\\cirrhosis.csv",sep = ",",header = T)
-head(df)
-```
+# breast cancer
 
-Cirrhosis results from prolonged liver damage, leading to extensive scarring, often due to conditions like hepatitis or chronic alcohol consumption. The data provided is sourced from a Mayo Clinic study on primary biliary cirrhosis (PBC) of the liver carried out from 1974 to 1984.
-
-<https://aasldpubs.onlinelibrary.wiley.com/doi/epdf/10.1002/hep.1840100102>
-
-| Variable Name | Type        | Description                                                                                                                                                                  | Units   |
-|---------------|-------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| ID            | Integer     | Categorical                                                                                                                                                                  |         |
-| N_Days        | Integer     | number of days between registration and the earlier of death, transplantation, or study analysis time in July 1986                                                           |         |
-| Status        | Categorical | status of the patient C (censored), CL (censored due to liver tx), or D (death)                                                                                              |         |
-| Drug          | Categorical | type of drug D-penicillamine or placebo                                                                                                                                      |         |
-| Age           | Integer     | age                                                                                                                                                                          | days    |
-| Sex           | Categorical | M (male) or F (female)                                                                                                                                                       |         |
-| Ascites       | Categorical | presence of ascites N (No) or Y (Yes)                                                                                                                                        |         |
-| Hepatomegaly  | Categorical | presence of hepatomegaly N (No) or Y (Yes)                                                                                                                                   |         |
-| Spiders       | Categorical | presence of spiders N (No) or Y (Yes)                                                                                                                                        |         |
-| Edema         | Categorical | presence of edema N (no edema and no diuretic therapy for edema), S (edema present without diuretics, or edema resolved by diuretics), or Y (edema despite diuretic therapy) |         |
-| Bilirubin     | Continuous  | serum bilirubin                                                                                                                                                              | mg/dl   |
-| Cholesterol   | Integer     | serum cholesterol                                                                                                                                                            | mg/dl   |
-| Albumin       | Continuous  | albumin                                                                                                                                                                      | gm/dl   |
-| Copper        | Integer     | urine copper                                                                                                                                                                 | ug/day  |
-| Alk_Phos      | Continuous  | alkaline phosphatase                                                                                                                                                         | U/liter |
-| SGOT          | Continuous  | SGOT                                                                                                                                                                         | U/ml    |
-| Tryglicerides | Integer     | tryglicerides                                                                                                                                                                |         |
-| Platelets     | Integer     | platelets per cubic                                                                                                                                                          | ml/1000 |
-| Prothrombin   | Continuous  | prothrombin time                                                                                                                                                             | s       |
-| Stage         | Categorical | histologic stage of disease (1, 2, 3, or 4)                                                                                                                                  |         |
-|               |             |                                                                                                                                                                              |         |
-
-
-
+https://www.kaggle.com/datasets/yasserh/breast-cancer-dataset
 
 ```{r}
-str(df)
-```
-
-```{r}
-dim(df)
-df <- na.omit(df)
-dim(df)
-```
-
-```{r}
-library(dplyr)
-Status <- factor(df$Status)
-df |> select(is.numeric) -> df
-df <- cbind(Status,df)
-df <- df[,-2]
-df <- df[,-13]
-# for (i in 1:ncol(df)) {
-#   if(typeof(df[,i])=="character"){
-#     df[,i] <- factor(df[,i])
-#   }
-# }
-# df$Stage <- factor(df$Stage)
-```
-
-```{r}
+library(tidyverse)
 library(klaR)
 library(MLmetrics)
-rda_out <- rda(Status~.,df)
+bc <- read.csv("C:\\Users\\danie\\Desktop\\2023 W1\\DATA 419C\\Project\\DATA_419_Project\\breast-cancer.csv") 
+```
+
+```{r}
+bc <- na.omit(bc)
+bc <- bc[,-1]
+bc$diagnosis <- factor(bc$diagnosis)
+bc
+```
+```{r}
+plot(bc[,-1])
+```
 
 
-ConfusionMatrix(predict(rda_out)$class, df$Status)
-
+```{r}
+rda_out <- rda(diagnosis~.,bc)
 # Calculate and format results
 post <- predict(rda_out)$posterior
 class <- predict(rda_out)$class
 y_pred <- as.numeric(predict(rda_out)$class)
-y_true <- as.numeric(df$Status)
+y_true <- as.numeric(bc$diagnosis)
+
+ConfusionMatrix(predict(rda_out)$class, bc$diagnosis)
+
 res <-
 data.frame(
 "Precision" = Precision(y_true, y_pred),
@@ -91,14 +49,10 @@ data.frame(
 )
 res
 ```
+## pca
 
 ```{r}
-factanal(df[,-1], factors = 2,rotation = "varimax") #TODo ask jeff if its bad to keep only 2 factors if we reject the null
-```
-
-
-```{r}
-pca.out <- prcomp(df[,-1])
+pca.out <- prcomp(bc[,-1])
 summary(pca.out)
 ```
 
@@ -107,12 +61,76 @@ loadi <- round(pca.out$rotation[,1:2],4)
 # loadi[abs(loadi)<0.001] <- NA
 loadi
 ```
-TODO try to interpret this...
 
 
 
-Then do visualization
+```{r}
+scores <- as.data.frame(pca.out$x)[,1:2]
+df <- cbind(scores,bc$diagnosis)
+colnames(df)[3] <- "diagnosis"
+rda(diagnosis~.,df)
+```
+
+```{r}
+loadi <- round(pca.out$rotation[,1:2],4)
+# loadi[abs(loadi)<0.001] <- NA
+loadi
+```
 
 
-Could be fun to try pair plot visualization
+
+```{r}
+scores <- as.data.frame(pca.out$x)[,1:2]
+df <- cbind(scores,bc$diagnosis)
+colnames(df)[3] <- "diagnosis"
+rda(diagnosis~.,df)
+```
+
+## nmf
+
+```{r}
+#x: the non-negative data (if any negatives exist, the whole data is shifted)
+#q: the number of factors/bases
+#eps: convergence criteria (lack of progress on sum squared error)
+#maxit: convergence criteria (max iteration when lack of progress not met)
+#w: n by q scores on factors
+#h: q by p observed factors/bases 
+#By default (when w, h NULL) both w and h are initialized randomly
+nmf <- function(x, q, eps=0.001, maxit=2000, w=NULL, h=NULL){
+  n <- nrow(x)
+  p <- ncol(x)
+  if(any(x<0)){x <- as.matrix(x)+abs(min(x))}
+  else{x <- as.matrix(x)}
+  if(is.null(w)){
+    w <- matrix(runif(n*q, min(x), max(x)), n, q)
+  }
+  if(is.null(h)){
+    h <- matrix(runif(p*q, min(x), max(x)), q, p)
+  }
+  ed <- sum((x-w%*%h)^2)
+  conv <- FALSE
+  ctr <- 1
+  while(!conv){
+    ctr <- ctr+1
+    h <- h * (t(w) %*% x) / (t(w) %*% w %*% h) 
+    w <- w * (x %*% t(h)) / (w %*% h %*% t(h))
+    wh <- w%*%h
+    ed[ctr] <- sum((x-wh)^2)
+    if((ed[ctr-1]-ed[ctr] < eps)|(ctr==maxit)){
+      conv <- TRUE
+    }
+  }
+  list(ed=ed, w=w, h=h, x=x)
+}
+```
+
+```{r}
+nmf.out <- nmf(bc[,-1],2)
+scores <- as.data.frame(nmf.out$w)
+df <- cbind(scores,bc$diagnosis)
+colnames(df)[3] <- "diagnosis"
+rda(diagnosis~.,df)
+```
+
+
 
