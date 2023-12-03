@@ -64,12 +64,12 @@ Mean of Cocave Points
 
 ```{r, message=FALSE, warning=FALSE}
 # plot(bc[,2:11])
-library(GGally)
-library(ggplot2)
-# ggpairs(bc[,2:11])
-data <- bc[,1:11]
-ggpairs(data, columns = 1:11, aes(color = diagnosis, alpha = 0.5),
-        upper = list(continuous = wrap("cor", size = 2.5)))
+# library(GGally)
+# library(ggplot2)
+# # ggpairs(bc[,2:11])
+# data <- bc[,1:11]
+# ggpairs(data, columns = 1:11, aes(color = diagnosis, alpha = 0.5),
+#         upper = list(continuous = wrap("cor", size = 2.5)))
 ```
 
 
@@ -254,6 +254,7 @@ plot1
 
 
 ```{r}
+library(mvtnorm)
 # sigma1 <- matrix(c(1, 0, 0, 1), 2, 2, byrow = TRUE)
     sigma1 <- matrix(c(2, 0, 0, 3), 2, 2, byrow = TRUE)
     mu1 <- c(-1, -1)
@@ -261,20 +262,20 @@ plot1
     sigma2 <- matrix(c(1, 0, 0, 1), 2, 2, byrow = TRUE)
     mu2 <- c(0, 0)
 
-    # sigma3 <- input$matrix3
-    # mu3 <- c(input$sld3x, input$sld3y)
+    sigma3 <- matrix(c(0.5, 0, 0, 0.5), 2, 2, byrow = TRUE)
+    mu3 <- c(1, 1)
 
     # DGP
     group1 <- data.frame(rmvnorm(100, mean = mu1, sigma = sigma1))
     group2 <- data.frame(rmvnorm(100, mean = mu2, sigma = sigma2))
-    # group3 <- data.frame(rmvnorm(100, mean = mu3, sigma = sigma3))
-    groups <- c(rep("G1", 100), rep("G2", 100))
+    group3 <- data.frame(rmvnorm(100, mean = mu3, sigma = sigma3))
+    groups <- c(rep("G1", 100), rep("G2", 100), rep("G3", 100))
 
     dgp <-
       data.frame(
         "G" = groups,
-        "X1" = c(group1$X1, group2$X1),
-        "X2" = c(group1$X2, group2$X2)
+        "X1" = c(group1$X1, group2$X1,group3$X1),
+        "X2" = c(group1$X2, group2$X2,group3$X2)
       )
 
     # Set up grid
@@ -286,12 +287,12 @@ plot1
     # Calculate densities values for dists
     pdf_values1 <- dmvnorm(grid, mean = mu1, sigma = sigma1)
     pdf_values2 <- dmvnorm(grid, mean = mu2, sigma = sigma2)
-    # pdf_values3 <- dmvnorm(grid, mean = mu3, sigma = sigma3)
+    pdf_values3 <- dmvnorm(grid, mean = mu3, sigma = sigma3)
 
     # Reshape the density values to match the grid
     density1 <- matrix(pdf_values1, nrow = length(x))
     density2 <- matrix(pdf_values2, nrow = length(x))
-    # density3 <- matrix(pdf_values3, nrow = length(x))
+    density3 <- matrix(pdf_values3, nrow = length(x))
 
     # Fit RDA model
     rda.out <-
@@ -300,9 +301,45 @@ plot1
           gamma = 1,
           lambda = 1)
 
+    
+    
+    
     # Get grid predictions
     prd = as.numeric(predict(rda.out, newdata = grid)$class)
+    
+    # Get mixture model density
+    unpooled_sigma <- rda.out$covariances
+mean_mle <- rda.out$means
+pooled_sigma <- rda.out$covpooled
+gamma <- rda.out$regularization[1]
+lambda <-  rda.out$regularization[2]
 
+sigma_lambda_1 <- (1- lambda) * unpooled_sigma[,,1] + lambda * pooled_sigma
+sigma_lambda_2 <- (1- lambda) * unpooled_sigma[,,2] + lambda * pooled_sigma
+sigma_lambda_3 <- (1- lambda) * unpooled_sigma[,,3] + lambda * pooled_sigma
+
+d <- 2
+sigma_mixed_1 <- (1 - gamma) * sigma_lambda_1 + gamma * (1/d) * sum(diag((sigma_lambda_1))) *  diag(2)
+sigma_mixed_2 <- (1 - gamma) * sigma_lambda_2 + gamma * (1/d) * sum(diag((sigma_lambda_2))) *  diag(2)
+sigma_mixed_3 <- (1 - gamma) * sigma_lambda_3 + gamma * (1/d) * sum(diag((sigma_lambda_3))) *  diag(2)
+
+# rda.out
+
+# Assuming `data` is your simulated dataset
+pdf_group1 <- dmvnorm(grid, mean = mean_mle[,1], sigma = sigma_mixed_1)
+pdf_group2 <- dmvnorm(grid, mean = mean_mle[,2], sigma = sigma_mixed_2)
+pdf_group3 <- dmvnorm(grid, mean = mean_mle[,3], sigma = sigma_mixed_3)
+
+prior_group1 <- rda.out$prior[1] 
+prior_group2 <- rda.out$prior[2]
+prior_group3 <- rda.out$prior[3]
+
+mixed_pdf <-  prior_group1*pdf_group1 + prior_group2*pdf_group2 + prior_group3*pdf_group3
+
+mixed_density <- matrix(mixed_pdf,nrow=length(x))
+
+
+opac_slid <- 0.5
     plot1 <-
       plot_ly() |>
       add_surface(
@@ -310,14 +347,28 @@ plot1
         y = y,
         z = density1,
         colors = "viridis",
-        opacity = 0.1,
+        opacity = opac_slid,
         showlegend = FALSE
       ) |> add_surface(
         x = x,
         y = y,
         z = density2,
         colors = "viridis",
-        opacity = 0.1,
+        opacity = opac_slid,
+        showlegend = FALSE
+      )|> add_surface(
+        x = x,
+        y = y,
+        z = density3,
+        colors = "viridis",
+        opacity = opac_slid,
+        showlegend = FALSE
+      )|> add_surface(
+        x = x,
+        y = y,
+        z = mixed_density,
+        colors = "viridis",
+        opacity = 1,
         showlegend = FALSE
       ) |> add_markers(
         data = dgp,
@@ -338,5 +389,9 @@ plot1
 
       )
 plot1
+    
+
+
+
 ```
 

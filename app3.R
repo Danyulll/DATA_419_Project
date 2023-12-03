@@ -124,18 +124,25 @@ ui <- dashboardPage(
           "Slider 1:",
           min = 0,
           max = 1,
-          value = 1
+          value = 0.5
         ),
         sliderInput(
           "slider2",
           "Slider 2:",
           min = 0,
           max = 1,
-          value = 1
+          value = 0.5
         ),
         sliderInput(
           "slider3",
           "Slider 3:",
+          min = 0,
+          max = 1,
+          value = 0.5
+        ),
+        sliderInput(
+          "slider4",
+          "Slider 4:",
           min = 0,
           max = 1,
           value = 1
@@ -215,6 +222,37 @@ server <- function(input, output, session) {
     # Get grid predictions
     prd = as.numeric(predict(rda.out, newdata = grid)$class)
 
+    # Get mixture model density
+    unpooled_sigma <- rda.out$covariances
+    mean_mle <- rda.out$means
+    pooled_sigma <- rda.out$covpooled
+    gamma <- rda.out$regularization[1]
+    lambda <-  rda.out$regularization[2]
+    
+    sigma_lambda_1 <- (1- lambda) * unpooled_sigma[,,1] + lambda * pooled_sigma
+    sigma_lambda_2 <- (1- lambda) * unpooled_sigma[,,2] + lambda * pooled_sigma
+    sigma_lambda_3 <- (1- lambda) * unpooled_sigma[,,3] + lambda * pooled_sigma
+    
+    d <- 2
+    sigma_mixed_1 <- (1 - gamma) * sigma_lambda_1 + gamma * (1/d) * sum(diag((sigma_lambda_1))) *  diag(2)
+    sigma_mixed_2 <- (1 - gamma) * sigma_lambda_2 + gamma * (1/d) * sum(diag((sigma_lambda_2))) *  diag(2)
+    sigma_mixed_3 <- (1 - gamma) * sigma_lambda_3 + gamma * (1/d) * sum(diag((sigma_lambda_3))) *  diag(2)
+    
+    # rda.out
+    
+    # Assuming `data` is your simulated dataset
+    pdf_group1 <- dmvnorm(grid, mean = mean_mle[,1], sigma = sigma_mixed_1)
+    pdf_group2 <- dmvnorm(grid, mean = mean_mle[,2], sigma = sigma_mixed_2)
+    pdf_group3 <- dmvnorm(grid, mean = mean_mle[,3], sigma = sigma_mixed_3)
+    
+    prior_group1 <- rda.out$prior[1] 
+    prior_group2 <- rda.out$prior[2]
+    prior_group3 <- rda.out$prior[3]
+    
+    mixed_pdf <-  prior_group1*pdf_group1 + prior_group2*pdf_group2 + prior_group3*pdf_group3
+    
+    mixed_density <- matrix(mixed_pdf,nrow=length(x))
+    
     plot1 <-
       plot_ly() |>
       add_surface(
@@ -237,6 +275,13 @@ server <- function(input, output, session) {
         z = density3,
         colors = "viridis",
         opacity = input$slider3,
+        showlegend = FALSE
+      )|> add_surface(
+        x = x,
+        y = y,
+        z = mixed_density,
+        colors = "viridis",
+        opacity = input$slider4,
         showlegend = FALSE
       ) |> add_markers(
         data = dgp,
