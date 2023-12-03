@@ -15,11 +15,42 @@ set.seed(231354)
 ui <- dashboardPage(
   dashboardHeader(title = "DATA 419 Project Title"),
   dashboardSidebar(sidebarMenu(
+    menuItem(tabName = "introduction", "Introduction"),
     menuItem(tabName = "simulation", "Simulation"),
     menuItem(tabName = "eda", "EDA"),
     menuItem(tabName = "pca & nmf", "PCA & NMF")
   )),
-  dashboardBody(tabItems(
+  dashboardBody(tabItems(tabItem(tabName = "introduction", box(
+    h3(
+      withMathJax(
+        "Goal of classifcation is the maximization of:
+        
+        $$P(Y=j | X = x_0)$$
+        
+        Given multivaraite normality on the groups we assume the following model:
+        
+        $$P(Y=j|X=x_0)=\\frac{\\pi_j f(x_0 | \\mu_j, \\Sigma_j)}{\\sum^G_{g=1}\\pi_g f(x_0|\\mu_g,\\Sigma_g)}$$
+        
+        
+        Regularized Discriminant Analysis imposes the following constraints:
+        
+        $$ \\begin{align}
+                                                    \\hat{\\Sigma}_k(\\lambda) &:= (1-\\lambda)\\hat{\\Sigma}_k+\\lambda\\hat{\\Sigma} \\\\
+                                  \\hat{\\Sigma}_k(\\lambda,\\gamma) &= (1-\\gamma)\\hat{\\Sigma}_k(\\lambda) + \\gamma \\frac{1}{d} \\text{tr}[\\hat{\\Sigma}_k(\\lambda)]I \\\\
+
+                                                   \\end{align} $$
+        
+        Resulting in a compromise between LDA and QDA. The extremes of the constraints give:
+        
+        $$ \\begin{align} 
+                       (\\gamma = 0, \\lambda = 0)&\\text{: QDA} \\\\
+                       (\\gamma = 0, \\lambda = 1)&\\text{: LDA} \\\\
+                       (\\gamma = 1, \\lambda = 0)&\\text{: Independent QDA} \\\\
+                       (\\gamma = 1, \\lambda = 1)&\\text{: Independent LDA} 
+                       \\end{align} $$"
+      )
+    ), width = 16
+  )), 
     tabItem(
       tabName = "simulation",
       box(plotlyOutput("plot"), width = 8, title = "Density"),
@@ -38,26 +69,18 @@ ui <- dashboardPage(
                        (\\gamma = 0, \\lambda = 0)&\\text{: QDA} \\\\
                        (\\gamma = 0, \\lambda = 1)&\\text{: LDA} \\\\
                        (\\gamma = 1, \\lambda = 0)&\\text{: Independent QDA} \\\\
-                       (\\gamma = 1, \\lambda = 1)&\\text{: Independent QDA} 
+                       (\\gamma = 1, \\lambda = 1)&\\text{: Independent LDA} 
                        \\end{align} $$")),numericInput("lambda", "Change lambda:", value = 0),
         numericInput("gamma", "Change gamma:", value = 0),
         actionButton("regenerate", "(Re)generate Plot"),
         width = 4
       ),
-      # box(
-      #   h3(withMathJax("$$ \\begin{align} 
-      #                   \\hat{\\Sigma}_k(\\lambda) &:= (1-\\lambda)\\hat{\\Sigma}_k+\\lambda\\hat{\\Sigma} \\\\  
-      # \\hat{\\Sigma}_k(\\lambda,\\gamma) &= (1-\\gamma)\\hat{\\Sigma}_k(\\lambda) + \\gamma \\frac{1}{d} \\text{tr}[\\hat{\\Sigma}_k(\\lambda)]I \\\\
-      # 
-      #                  \\end{align} $$")),width = 8
-      # ),
-      
       box(
         matrixInput(
           "matrix1",
           label = "G1",
           value = matrix(
-            c(1, 0, 0, 1),
+            c(2, 0, 0, 3),
             nrow = 2,
             ncol = 2,
             byrow = TRUE
@@ -84,7 +107,7 @@ ui <- dashboardPage(
           "matrix3",
           label = "G3",
           value = matrix(
-            c(1, 0, 0, 1),
+            c(0.5, 0, 0, 0.5),
             nrow = 2,
             ncol = 2,
             byrow = TRUE
@@ -101,25 +124,25 @@ ui <- dashboardPage(
           "Slider 1:",
           min = 0,
           max = 1,
-          value = 0.5
+          value = 1
         ),
         sliderInput(
           "slider2",
           "Slider 2:",
           min = 0,
           max = 1,
-          value = 0.5
+          value = 1
         ),
         sliderInput(
           "slider3",
           "Slider 3:",
           min = 0,
           max = 1,
-          value = 0.5
+          value = 1
         ),width = 4
       )
     ),
-    tabItem(tabName = "eda",     fluidRow(
+    tabItem(tabName = "eda",fluidRow(
       box(
         title = "Dataframe Box",
         width = 7,
@@ -131,9 +154,12 @@ ui <- dashboardPage(
             tableOutput("summaryOutput"),width=3),
       box(plotOutput("pairs1")),
       box(plotOutput("pairs2"))
-    )),tabItem(tabName = "pca & nmf")
+    )),tabItem(tabName = "pca & nmf",fluidRow(
+      box(selectInput("diminput", "Select Dim", choices =c("PCA","NMF")),
+          tableOutput("dimout"),width = 5)
+      ,box(plotlyOutput("plot2"),width = 8),box(tableOutput("lam"),width = 3))
   ))
-)
+))
    
 server <- function(input, output, session) {
   
@@ -293,6 +319,196 @@ server <- function(input, output, session) {
   })
   
   
+  # Tab3
+  output$dimout <- renderTable({
+    selected_method <- input$diminput
+    
+    if(selected_method == "PCA"){
+      pca.out <- prcomp(bc[,-1],scale. = TRUE)
+      scores <- as.data.frame(pca.out$x)[,1:2]
+      
+      cum_prop_var <- summary(pca.out)$importance[3,2]
+      loadi <- round(pca.out$rotation[,1:2],2)
+      
+      
+      cbind(`row names` = rownames(loadi), loadi)
+      
+    }else if(selected_method == "NMF"){
+      set.seed(87460945)
+      # NMF preds
+      bc_temp <- scale(bc[,-1], center = FALSE, scale = TRUE) 
+      nmf.out <- nmf(bc_temp,2)
+      scores <- as.data.frame(nmf.out$w)
+      loadi.nmf <- round(nmf.out$h,2)
+      
+      
+      cbind(`row names` = rownames(t(loadi.nmf)), t(loadi.nmf))
+      }
+    
+  })
+  
+  # NMF
+  #x: the non-negative data (if any negatives exist, the whole data is shifted)
+  #q: the number of factors/bases
+  #eps: convergence criteria (lack of progress on sum squared error)
+  #maxit: convergence criteria (max iteration when lack of progress not met)
+  #w: n by q scores on factors
+  #h: q by p observed factors/bases 
+  #By default (when w, h NULL) both w and h are initialized randomly
+  nmf <- function(x, q, eps=0.001, maxit=2000, w=NULL, h=NULL){
+    n <- nrow(x)
+    p <- ncol(x)
+    if(any(x<0)){x <- as.matrix(x)+abs(min(x))}
+    else{x <- as.matrix(x)}
+    if(is.null(w)){
+      w <- matrix(runif(n*q, min(x), max(x)), n, q)
+    }
+    if(is.null(h)){
+      h <- matrix(runif(p*q, min(x), max(x)), q, p)
+    }
+    ed <- sum((x-w%*%h)^2)
+    conv <- FALSE
+    ctr <- 1
+    while(!conv){
+      ctr <- ctr+1
+      h <- h * (t(w) %*% x) / (t(w) %*% w %*% h) 
+      w <- w * (x %*% t(h)) / (w %*% h %*% t(h))
+      wh <- w%*%h
+      ed[ctr] <- sum((x-wh)^2)
+      if((ed[ctr-1]-ed[ctr] < eps)|(ctr==maxit)){
+        conv <- TRUE
+      }
+    }
+    list(ed=ed, w=w, h=h, x=x)
+  }
+  
+  
+  
+  output$lam <- renderTable({
+    selected_method <- input$diminput
+    if(selected_method == "PCA"){
+      
+      # PCA preds
+      pca.out <- prcomp(bc[,-1],scale. = TRUE)
+      scores <- as.data.frame(pca.out$x)[,1:2]
+      df <- cbind(scores,bc$diagnosis)
+      colnames(df)[3] <- "diagnosis"
+      rda_out.pca <- rda(diagnosis~.,df)
+      
+      
+      
+      data.frame("Gamma" = rda_out.pca$regularization[1], "Lambda" = rda_out.pca$regularization[2])
+      
+    } else if(selected_method == "NMF"){
+      
+      set.seed(87460945)
+      # NMF preds
+      bc_temp <- scale(bc[,-1], center = FALSE, scale = TRUE) 
+      nmf.out <- nmf(bc_temp,2)
+      scores <- as.data.frame(nmf.out$w)
+      scores$diagnosis <- bc$diagnosis
+      rda_out.nmf <- rda(diagnosis~.,scores)
+      
+      data.frame("Gamma" = rda_out.nmf$regularization[1], "Lambda" = rda_out.nmf$regularization[2])
+      
+    }
+  })
+  
+  output$plot2 <- renderPlotly({
+    selected_method <- input$diminput
+   if(selected_method == "PCA"){
+     
+     # PCA preds
+     pca.out <- prcomp(bc[,-1],scale. = TRUE)
+     scores <- as.data.frame(pca.out$x)[,1:2]
+     df <- cbind(scores,bc$diagnosis)
+     colnames(df)[3] <- "diagnosis"
+     rda_out.pca <- rda(diagnosis~.,df)
+     x <- seq(-10, 4, length.out = 100)
+     y <- seq(-8, 4, length.out = 100)
+     grid <- expand.grid(x = x, y = y)
+     colnames(grid) <- c("PC1", "PC2")
+     
+     # Get grid predictions
+     prd = as.numeric(predict(rda_out.pca, newdata = grid)$class)
+     
+     
+ 
+     
+     plot1 <-
+       plot_ly()|> add_markers(
+         data = scores,
+         x = scores$PC1,
+         y = scores$PC2,
+         z = 0,
+         opacity = 1,
+         color = ~ bc$diagnosis,
+         marker = list(size = 4),
+         colors = "viridis",
+         showlegend = FALSE
+       ) |> add_markers(
+         x = grid$PC1,
+         y = grid$PC2,
+         z = 0,
+         color = ~prd,
+         opacity=0.03,
+         showlegend = FALSE
+       )
+     
+     
+     
+   } else if(selected_method == "NMF"){
+     
+     set.seed(87460945)
+     # NMF preds
+     bc_temp <- scale(bc[,-1], center = FALSE, scale = TRUE) 
+     nmf.out <- nmf(bc_temp,2)
+     scores <- as.data.frame(nmf.out$w)
+     scores$diagnosis <- bc$diagnosis
+     rda_out.nmf <- rda(diagnosis~.,scores)
+     
+     x <- seq(0, 8, length.out = 100)
+     y <- seq(0, 4, length.out = 100)
+     grid2 <- expand.grid(x = x, y = y)
+     colnames(grid2) <- c("V1", "V2")
+     
+     # Get grid predictions
+     prd = as.numeric(predict(rda_out.nmf, newdata = grid2)$class)
+     
+     
+     
+     plot1 <-
+       plot_ly()|> add_markers(
+         data = scores,
+         x = scores$V1,
+         y = scores$V2,
+         z = 0,
+         opacity = 1,
+         color = ~ bc$diagnosis,
+         marker = list(size = 4),
+         colors = "viridis",
+         showlegend = FALSE
+       ) |> add_markers(
+         x = grid2$V1,
+         y = grid2$V2,
+         z = 0,
+         color = ~prd,
+         opacity=0.01,
+         showlegend = FALSE
+       )
+
+     
+   }
+
+  })
+  
+
+  
+  # # NMF preds
+  # scores <- as.data.frame(nmf.out$w)
+  # df <- cbind(scores,bc$diagnosis)
+  # colnames(df)[3] <- "diagnosis"
+  # rda_out.nmf <- rda(diagnosis~.,df)
   
 }
 # thematic_shiny()

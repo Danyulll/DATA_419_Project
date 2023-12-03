@@ -95,24 +95,64 @@ res
 ## pca
 
 ```{r}
-pca.out <- prcomp(bc[,-1])
-summary(pca.out)
-```
-
-```{r}
+pca.out <- prcomp(bc[,-1],scale. = TRUE)
+cum_prop_var <- summary(pca.out)$importance[3,2]
 loadi <- round(pca.out$rotation[,1:2],4)
-# loadi[abs(loadi)<0.001] <- NA
 loadi
 ```
 
-
-
 ```{r}
+library(klaR)
 scores <- as.data.frame(pca.out$x)[,1:2]
 df <- cbind(scores,bc$diagnosis)
 colnames(df)[3] <- "diagnosis"
-rda(diagnosis~.,df)
+rda_out.pca <- rda(diagnosis~.,df)
+rda_out.pca
 ```
+
+```{r}
+library(plotly)
+# Set up grid
+    x <- seq(-10, 4, length.out = 100)
+    y <- seq(-8, 4, length.out = 100)
+    grid <- expand.grid(x = x, y = y)
+    colnames(grid) <- c("PC1", "PC2")
+    
+    # Get grid predictions
+    prd = as.numeric(predict(rda_out.pca, newdata = grid)$class)
+    
+    
+    # PCA preds
+    scores <- as.data.frame(pca.out$x)[,1:2]
+    df <- cbind(scores,bc$diagnosis)
+    colnames(df)[3] <- "diagnosis"
+    rda_out.pca <- rda(diagnosis~.,df)
+    
+    plot1 <-
+      plot_ly()|> add_markers(
+        data = scores,
+        x = scores$PC1,
+        y = scores$PC2,
+        z = 0,
+        opacity = 1,
+        color = ~ bc$diagnosis,
+        marker = list(size = 4),
+        colors = "viridis",
+        showlegend = FALSE
+      ) |> add_markers(
+        x = grid$PC1,
+        y = grid$PC2,
+        z = 0,
+        color = ~prd,
+        opacity=0.03,
+        showlegend = FALSE
+      )
+    
+plot1
+```
+
+
+
 
 ```{r}
 loadi <- round(pca.out$rotation[,1:2],4)
@@ -168,12 +208,135 @@ nmf <- function(x, q, eps=0.001, maxit=2000, w=NULL, h=NULL){
 ```
 
 ```{r}
-nmf.out <- nmf(bc[,-1],2)
-scores <- as.data.frame(nmf.out$w)
-df <- cbind(scores,bc$diagnosis)
-colnames(df)[3] <- "diagnosis"
-rda(diagnosis~.,df)
+library(plotly)
+    set.seed(87460945)
+    # NMF preds
+    bc_temp <- scale(bc[,-1], center = FALSE, scale = TRUE) 
+    nmf.out <- nmf(bc_temp,2)
+    scores <- as.data.frame(nmf.out$w)
+    scores$diagnosis <- bc$diagnosis
+    rda_out.nmf <- rda(diagnosis~.,scores)
+
+    summary(scores)
+    
+    x <- seq(0, 8, length.out = 100)
+    y <- seq(0, 4, length.out = 100)
+    grid2 <- expand.grid(x = x, y = y)
+    colnames(grid2) <- c("V1", "V2")
+    
+    # Get grid predictions
+    prd = as.numeric(predict(rda_out.nmf, newdata = grid2)$class)
+    
+  
+    
+    plot1 <-
+      plot_ly()|> add_markers(
+        data = scores,
+        x = scores$V1,
+        y = scores$V2,
+        z = 0,
+        opacity = 1,
+        color = ~ bc$diagnosis,
+        marker = list(size = 4),
+        colors = "viridis",
+        showlegend = FALSE
+      ) |> add_markers(
+        x = grid2$V1,
+        y = grid2$V2,
+        z = 0,
+        color = ~prd,
+        opacity=0.03,
+        showlegend = FALSE
+      )
+
+plot1
 ```
 
 
+```{r}
+# sigma1 <- matrix(c(1, 0, 0, 1), 2, 2, byrow = TRUE)
+    sigma1 <- matrix(c(2, 0, 0, 3), 2, 2, byrow = TRUE)
+    mu1 <- c(-1, -1)
+
+    sigma2 <- matrix(c(1, 0, 0, 1), 2, 2, byrow = TRUE)
+    mu2 <- c(0, 0)
+
+    # sigma3 <- input$matrix3
+    # mu3 <- c(input$sld3x, input$sld3y)
+
+    # DGP
+    group1 <- data.frame(rmvnorm(100, mean = mu1, sigma = sigma1))
+    group2 <- data.frame(rmvnorm(100, mean = mu2, sigma = sigma2))
+    # group3 <- data.frame(rmvnorm(100, mean = mu3, sigma = sigma3))
+    groups <- c(rep("G1", 100), rep("G2", 100))
+
+    dgp <-
+      data.frame(
+        "G" = groups,
+        "X1" = c(group1$X1, group2$X1),
+        "X2" = c(group1$X2, group2$X2)
+      )
+
+    # Set up grid
+    x <- seq(-5, 5, length.out = 100)
+    y <- seq(-5, 5, length.out = 100)
+    grid <- expand.grid(x = x, y = y)
+    colnames(grid) <- c("X1", "X2")
+
+    # Calculate densities values for dists
+    pdf_values1 <- dmvnorm(grid, mean = mu1, sigma = sigma1)
+    pdf_values2 <- dmvnorm(grid, mean = mu2, sigma = sigma2)
+    # pdf_values3 <- dmvnorm(grid, mean = mu3, sigma = sigma3)
+
+    # Reshape the density values to match the grid
+    density1 <- matrix(pdf_values1, nrow = length(x))
+    density2 <- matrix(pdf_values2, nrow = length(x))
+    # density3 <- matrix(pdf_values3, nrow = length(x))
+
+    # Fit RDA model
+    rda.out <-
+      rda(G ~ .,
+          dgp,
+          gamma = 1,
+          lambda = 1)
+
+    # Get grid predictions
+    prd = as.numeric(predict(rda.out, newdata = grid)$class)
+
+    plot1 <-
+      plot_ly() |>
+      add_surface(
+        x = x,
+        y = y,
+        z = density1,
+        colors = "viridis",
+        opacity = 0.1,
+        showlegend = FALSE
+      ) |> add_surface(
+        x = x,
+        y = y,
+        z = density2,
+        colors = "viridis",
+        opacity = 0.1,
+        showlegend = FALSE
+      ) |> add_markers(
+        data = dgp,
+        x = dgp$X1,
+        y = dgp$X2,
+        z = 0,
+        opacity = 1,
+        color = ~ dgp$G,
+        marker = list(size = 4),
+        showlegend = FALSE
+      ) |> add_markers(
+        x = grid$X1,
+        y = grid$X2,
+        z = 0,
+        color =  ~ prd,
+        opacity = 0.01,
+        showlegend = FALSE
+
+      )
+plot1
+```
 
